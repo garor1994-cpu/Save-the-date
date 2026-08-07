@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Save the Date - Carrera al Altar</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background-color: #121212;
+      color: #fff;
+      font-family: 'Courier New', Courier, monospace;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #game-card {
+      position: relative;
+      width: 100vw;
+      max-width: 420px;
+      height: 100vh;
+      max-height: 750px;
+      background: #1a1a2e;
+      border: 4px solid #f39c12;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 0 25px rgba(243, 156, 18, 0.4);
+    }
+    canvas { width: 100%; height: 100%; display: block; }
+    .screen-overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(15, 15, 30, 0.92);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+      text-align: center;
+    }
+    .hidden { display: none !important; }
+    h1 { color: #f1c40f; font-size: 26px; text-shadow: 2px 2px #e67e22; margin-bottom: 12px; }
+    p { font-size: 14px; line-height: 1.4; color: #ddd; margin-bottom: 16px; }
+    .date-box {
+      background: #e74c3c;
+      color: #fff;
+      padding: 12px 20px;
+      font-size: 20px;
+      font-weight: bold;
+      border-radius: 8px;
+      border: 2px dashed #fff;
+      margin: 16px 0;
+      letter-spacing: 2px;
+    }
+    .btn {
+      background: #2ecc71;
+      color: #fff;
+      border: none;
+      padding: 14px 24px;
+      font-size: 15px;
+      font-weight: bold;
+      border-radius: 30px;
+      margin: 6px 0;
+      width: 85%;
+      cursor: pointer;
+      box-shadow: 0 4px #27ae60;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn:active { transform: translateY(3px); box-shadow: 0 1px #27ae60; }
+    .btn-alt { background: #3498db; box-shadow: 0 4px #2980b9; }
+    .btn-alt:active { box-shadow: 0 1px #2980b9; }
+  </style>
+</head>
+<body>
+
+<div id="game-card">
+  <canvas id="canvas"></canvas>
+
+  <!-- Pantalla de Inicio -->
+  <div id="start-screen" class="screen-overlay">
+    <h1>STAGE 1: LA CARRERA</h1>
+    <p>¡Ayúdanos a llegar al altar!<br>Toca la pantalla para saltar los imprevistos.</p>
+    <div style="font-size: 48px; margin: 20px 0;">🏃‍♂️💨🏃‍♀️</div>
+    <button class="btn" onclick="startGame()">¡PRESS START!</button>
+  </div>
+
+  <!-- Pantalla de Victoria -->
+  <div id="win-screen" class="screen-overlay hidden">
+    <h1>¡STAGE CLEAR!</h1>
+    <p>¡Has desbloqueado el gran secreto!</p>
+    <div style="font-size: 18px; color: #f1c40f;">¡NOS CASAMOS!</div>
+    <div class="date-box" id="display-date">14 · ABR · 2028</div>
+    <p style="font-size: 13px; color: #aaa;">Valencia, España</p>
+
+    <!-- Enlace dinámico a Google Calendar -->
+    <a id="cal-link" target="_blank" class="btn" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=Boda+de+Nosotros&dates=20280414T170000Z/20280414T230000Z&details=¡Reserva+el+día!&location=Valencia">📅 Añadir a mi Calendar</a>
+    
+    <!-- Enlace directo a WhatsApp -->
+    <a class="btn btn-alt" href="https://wa.me/?text=¡He+superado+el+juego!+Nos+vemos+el+14+de+Abril+de+2028." target="_blank">💬 Confirmar asistencia</a>
+    
+    <button class="btn" style="background:#7f8c8d; box-shadow:0 4px #95a5a6; margin-top:12px;" onclick="startGame()">🔄 Jugar de nuevo</button>
+  </div>
+</div>
+
+<script>
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const startScreen = document.getElementById('start-screen');
+  const winScreen = document.getElementById('win-screen');
+
+  canvas.width = 400;
+  canvas.height = 650;
+
+  let gameRunning = false;
+  let progress = 0;
+  let frame = 0;
+
+  const player = {
+    x: 60, y: 480, w: 36, h: 48,
+    vy: 0, gravity: 0.65, jumpPower: -12.5,
+    isGrounded: true
+  };
+
+  let obstacles = [];
+  let collectibles = [];
+
+  function jump() {
+    if (!gameRunning) return;
+    if (player.isGrounded) {
+      player.vy = player.jumpPower;
+      player.isGrounded = false;
+    }
+  }
+
+  window.addEventListener('touchstart', (e) => { if(gameRunning) { jump(); e.preventDefault(); } }, {passive: false});
+  window.addEventListener('mousedown', () => { if(gameRunning) jump(); });
+  window.addEventListener('keydown', (e) => { if (e.code === 'Space' && gameRunning) jump(); });
+
+  function startGame() {
+    startScreen.classList.add('hidden');
+    winScreen.classList.add('hidden');
+    progress = 0;
+    frame = 0;
+    obstacles = [];
+    collectibles = [];
+    player.y = 480;
+    player.vy = 0;
+    player.isGrounded = true;
+    gameRunning = true;
+    requestAnimationFrame(update);
+  }
+
+  function winGame() {
+    gameRunning = false;
+    winScreen.classList.remove('hidden');
+  }
+
+  function update() {
+    if (!gameRunning) return;
+    frame++;
+
+    progress += 0.08;
+    if (progress >= 100) {
+      progress = 100;
+      winGame();
+      return;
+    }
+
+    player.vy += player.gravity;
+    player.y += player.vy;
+    if (player.y >= 480) {
+      player.y = 480;
+      player.vy = 0;
+      player.isGrounded = true;
+    }
+
+    if (frame % 110 === 0) {
+      obstacles.push({ x: 420, y: 492, w: 30, h: 36, type: Math.random() > 0.5 ? '⏰' : '💸' });
+    }
+
+    if (frame % 85 === 0) {
+      collectibles.push({ x: 420, y: 410 - Math.random() * 60, w: 24, h: 24, type: '💍' });
+    }
+
+    obstacles.forEach(obs => obs.x -= 4.2);
+    collectibles.forEach(col => col.x -= 4.2);
+
+    obstacles = obstacles.filter(obs => obs.x > -40);
+    collectibles = collectibles.filter(col => col.x > -40);
+
+    draw();
+    requestAnimationFrame(update);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#27ae60';
+    ctx.fillRect(0, 516, canvas.width, 134);
+    ctx.fillStyle = '#2ecc71';
+    ctx.fillRect(0, 516, canvas.width, 12);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.fillRect(20, 20, 360, 16);
+    ctx.fillStyle = '#f1c40f';
+    ctx.fillRect(20, 20, (360 * progress) / 100, 16);
+    ctx.fillStyle = '#fff';
+    ctx.font = '12px monospace';
+    ctx.fillText(`CARRERA AL ALTAR: ${Math.floor(progress)}%`, 20, 50);
+
+    ctx.font = '32px sans-serif';
+    ctx.fillText('🏃‍♂️🏃‍♀️', player.x - 10, player.y + 28);
+
+    obstacles.forEach(obs => {
+      ctx.font = '28px sans-serif';
+      ctx.fillText(obs.type, obs.x, obs.y + 28);
+    });
+
+    collectibles.forEach(col => {
+      ctx.font = '22px sans-serif';
+      ctx.fillText(col.type, col.x, col.y + 20);
+    });
+  }
+</script>
+</body>
+</html>
